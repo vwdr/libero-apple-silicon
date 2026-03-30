@@ -1,0 +1,29 @@
+# Core dependencies — versions match the tested libero conda env (Python 3.8)
+# Install via: pip install -r requirements.txt
+#
+# IMPORTANT: torch must be installed separately with the correct index for your
+# platform.  On Apple Silicon (no CUDA):
+#   pip install torch torchvision
+# The versions below are what was tested; newer patch releases are fine.
+
+torch>=2.4.0
+torchvision>=0.19.0
+
+numpy>=1.22,<2.0          # gym 0.25 is incompatible with NumPy 2.x
+easydict>=1.9
+hydra-core>=1.2.0
+omegaconf>=2.3.0
+h5py>=3.0
+opencv-python>=4.6
+matplotlib>=3.5
+transformers>=4.30         # BERT tokenizer for task embeddings
+
+# LIBERO itself (installed editable from source)
+# git clone https://github.com/Lifelong-Robot-Learning/LIBERO.git
+# pip install -e LIBERO/
+
+# robomimic (LIBERO dependency)
+# pip install robomimic==0.2.0
+
+# gym (LIBERO uses the legacy gym API)
+gym==0.25.2

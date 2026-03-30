@@ -1,0 +1,31 @@
+# Training artifacts
+experiments/
+bert/
+outputs/
+multirun/
+
+# Results (keep structure, ignore content)
+results/*.mp4
+results/*.pt
+results/*.json
+results/*.png
+!results/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.so
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Env
+.env
+*.env
