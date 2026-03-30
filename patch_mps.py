@@ -34,7 +34,15 @@ What it fixes
    fork safety).  We wrap DataLoader.__init__ to force
    persistent_workers=False whenever num_workers == 0.
 
-5. compute_flops
+5. evaluate_one_task_success — respect cfg.eval.eval
+   base.py calls evaluate_one_task_success at epoch 0, eval_every, etc.
+   unconditionally — it never checks cfg.eval.eval.  So --no_eval_during_
+   training (which sets eval.eval=False) has no effect on the per-epoch
+   rollout evals, each of which takes ~400s on MPS.
+   Fix: wrap the function to return 0.0 immediately when cfg.eval.eval
+   is False.
+
+6. compute_flops
    Uses thop.profile which runs a full forward pass under hook-based MAC
    counting.  thop does not support MPS and triggers the same
    SinusoidalPositionEncoding crash even after fix #3 (because thop
@@ -222,6 +230,34 @@ for _importer, _modname, _ispkg in pkgutil.walk_packages(
 # Patch compute_flops in main.py's module namespace
 import libero.lifelong.main as _lmain
 _lmain.compute_flops = _compute_flops_mps
+
+# ---------------------------------------------------------------------------
+# 5. Patch evaluate_one_task_success to respect cfg.eval.eval
+# ---------------------------------------------------------------------------
+
+from libero.lifelong.metric import evaluate_one_task_success as _orig_eval_success
+
+def _evaluate_one_task_success_mps(cfg, algo, task, task_emb, task_id,
+                                   sim_states=None, task_str=""):
+    """
+    Wraps evaluate_one_task_success to honour cfg.eval.eval.
+
+    base.py calls this at epoch 0 and every eval_every epochs regardless
+    of cfg.eval.eval — each call runs 20 rollout episodes (~400s on MPS).
+    When cfg.eval.eval is False (--no_eval_during_training), skip and
+    return 0.0 so training runs at full speed.
+    """
+    if not getattr(getattr(cfg, "eval", None), "eval", True):
+        return 0.0
+    return _orig_eval_success(cfg, algo, task, task_emb, task_id,
+                              sim_states=sim_states, task_str=task_str)
+
+_lm.evaluate_one_task_success = _evaluate_one_task_success_mps
+
+# Patch in base.py (which imports it via `from libero.lifelong.metric import *`)
+import libero.lifelong.algos.base as _base_algo
+_base_algo.evaluate_one_task_success = _evaluate_one_task_success_mps
+
 
 # Patch SinusoidalPositionEncoding.forward in the transformer module
 from libero.lifelong.models.modules.transformer_modules import SinusoidalPositionEncoding
