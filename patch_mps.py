@@ -27,7 +27,14 @@ What it fixes
    accepted by the .type() casting API, raising a ValueError.
    Fix: replace with .to(dtype=self.inv_freq.dtype).
 
-4. compute_flops
+4. DataLoader persistent_workers
+   LIBERO hardcodes persistent_workers=True in three algo files
+   (base.py, er.py, multitask.py).  PyTorch raises ValueError if
+   persistent_workers=True while num_workers=0 (which we set for macOS
+   fork safety).  We wrap DataLoader.__init__ to force
+   persistent_workers=False whenever num_workers == 0.
+
+5. compute_flops
    Uses thop.profile which runs a full forward pass under hook-based MAC
    counting.  thop does not support MPS and triggers the same
    SinusoidalPositionEncoding crash even after fix #3 (because thop
@@ -105,7 +112,44 @@ def _torch_load_model_mps(model_path: str, map_location=None):
 
 
 # ---------------------------------------------------------------------------
-# 3. Patched SinusoidalPositionEncoding.forward
+# 3. Patched DataLoader — fix persistent_workers=True with num_workers=0
+# ---------------------------------------------------------------------------
+
+from torch.utils.data import DataLoader as _OrigDataLoader
+
+class _DataLoaderMPS(_OrigDataLoader):
+    """
+    Thin subclass that silently corrects:
+        persistent_workers=True + num_workers=0  →  persistent_workers=False
+
+    PyTorch raises ValueError on this combo.  LIBERO hardcodes
+    persistent_workers=True in base.py, er.py, and multitask.py;
+    we set num_workers=0 for macOS safety.
+    """
+    def __init__(self, *args, **kwargs):
+        if kwargs.get("num_workers", 0) == 0 and kwargs.get("persistent_workers", False):
+            kwargs["persistent_workers"] = False
+        super().__init__(*args, **kwargs)
+
+# Patch the name in all algo modules so their `DataLoader(...)` calls hit our subclass
+import torch.utils.data as _tud
+_tud.DataLoader = _DataLoaderMPS          # affects new imports
+import libero.lifelong.algos.base as _base_mod
+_base_mod.DataLoader = _DataLoaderMPS
+try:
+    import libero.lifelong.algos.er as _er_mod
+    _er_mod.DataLoader = _DataLoaderMPS
+except Exception:
+    pass
+try:
+    import libero.lifelong.algos.multitask as _mt_mod
+    _mt_mod.DataLoader = _DataLoaderMPS
+except Exception:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# 4. Patched SinusoidalPositionEncoding.forward
 # ---------------------------------------------------------------------------
 
 def _sinusoidal_forward_mps(self, x):
