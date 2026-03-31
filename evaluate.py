@@ -169,6 +169,13 @@ def main():
     cfg.eval.max_steps     = args.max_steps
     os.makedirs(getattr(cfg, "experiment_dir", "experiments/tmp"), exist_ok=True)
 
+    # ---- Initialize ObsUtils (normally done inside get_dataset) ----
+    # robomimic's ObsUtils.process_obs needs OBS_KEYS_TO_MODALITIES populated.
+    # In the training pipeline this happens via get_dataset(initialize_obs_utils=True).
+    # For standalone evaluation we initialize it directly from the config.
+    import robomimic.utils.obs_utils as ObsUtils
+    ObsUtils.initialize_obs_utils_with_obs_specs({"obs": cfg.data.obs.modality})
+
     benchmark_name = BENCHMARK_NAME_MAP[args.benchmark]
     benchmark      = get_benchmark(benchmark_name)(cfg.data.task_order_index)
     n_tasks        = benchmark.n_tasks

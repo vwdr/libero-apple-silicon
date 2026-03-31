@@ -195,6 +195,11 @@ def main():
         sys.exit(1)
 
     cfg = build_cfg_from_checkpoint(ckpt_cfg, device, args)
+
+    # Initialize ObsUtils before any rollout (normally done inside get_dataset)
+    import robomimic.utils.obs_utils as ObsUtils
+    ObsUtils.initialize_obs_utils_with_obs_specs({"obs": cfg.data.obs.modality})
+
     benchmark_name = BENCHMARK_NAME_MAP[args.benchmark]
 
     # ---- Build algorithm / policy ----
