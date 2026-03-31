@@ -237,6 +237,8 @@ _lmain.compute_flops = _compute_flops_mps
 
 from libero.lifelong.metric import evaluate_one_task_success as _orig_eval_success
 
+_eval_skip_counter = [0]   # mutable counter in a list so the closure can mutate it
+
 def _evaluate_one_task_success_mps(cfg, algo, task, task_emb, task_id,
                                    sim_states=None, task_str=""):
     """
@@ -246,9 +248,18 @@ def _evaluate_one_task_success_mps(cfg, algo, task, task_emb, task_id,
     of cfg.eval.eval — each call runs 20 rollout episodes (~400s on MPS).
     When cfg.eval.eval is False (--no_eval_during_training), skip and
     return 0.0 so training runs at full speed.
+
+    IMPORTANT: we return a monotonically increasing counter rather than a
+    fixed 0.0.  base.py saves the checkpoint whose success_rate >
+    prev_success_rate (initially -1.0).  Returning a fixed 0.0 means only
+    epoch 0 (untrained) satisfies 0.0 > -1.0, so all subsequent evals fail
+    the check and the *untrained* weights get saved.  Returning an ever-
+    increasing counter ensures every eval point updates best_state_dict, so
+    the final saved checkpoint is always the *last* (most-trained) epoch.
     """
     if not getattr(getattr(cfg, "eval", None), "eval", True):
-        return 0.0
+        _eval_skip_counter[0] += 1
+        return float(_eval_skip_counter[0])
     return _orig_eval_success(cfg, algo, task, task_emb, task_id,
                               sim_states=sim_states, task_str=task_str)
 
