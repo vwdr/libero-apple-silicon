@@ -77,12 +77,14 @@ def make_dummy_obs(cfg, task_emb: torch.Tensor, device: str) -> dict:
     seq_len = cfg.data.seq_len
     h, w    = cfg.data.img_h, cfg.data.img_w
 
+    # Shapes must match raw_obs_to_tensor_obs output (no time dim).
+    # base_policy.preprocess_input adds the time dim via unsqueeze(1) at inference time.
     data = {
         "obs": {
-            "agentview_rgb":   torch.zeros(1, seq_len, 3, h, w),
-            "eye_in_hand_rgb": torch.zeros(1, seq_len, 3, h, w),
-            "gripper_states":  torch.zeros(1, seq_len, 2),
-            "joint_states":    torch.zeros(1, seq_len, 7),
+            "agentview_rgb":   torch.zeros(1, 3, h, w),
+            "eye_in_hand_rgb": torch.zeros(1, 3, h, w),
+            "gripper_states":  torch.zeros(1, 2),
+            "joint_states":    torch.zeros(1, 7),
         },
         "task_emb": task_emb.unsqueeze(0),
     }
